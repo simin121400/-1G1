@@ -495,7 +495,7 @@ body.picture-edition.motion-off .day-waves svg{animation:none!important}
  <div class="brand login-brand"><h1 class="game-title">海底牧场游记</h1></div>
 <div class="login-world"><div class="login-art" aria-hidden="true"></div><div class="portal-sparkles" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
   <div class="login-card"><div class="portal-kicker">登船入口 / 五站阅读探险</div><h2 id="loginTitle">探险员，<br>你的五用车就绪。</h2><p>乘坐五用车，让课文里的文字线索带你找到下一站。</p>
-   <form id="loginForm" class="login-form" novalidate><label for="studentName">你的名字</label><input id="studentName" class="name-input" type="text" maxlength="30" autocomplete="name" placeholder="输入你的名字" required aria-describedby="loginError"><p id="loginError" class="login-error" role="status" aria-live="polite"></p><button id="loginBtn" class="primary" type="submit">登入，准备登船<svg><use href="#arrow"/></svg></button></form><div class="boarding-note">一段海底游记，等你用文字发现。</div>
+   <form id="loginForm" class="login-form" novalidate><label for="studentName">你的探险昵称／编号（请勿使用真实姓名）</label><input id="studentName" class="name-input" type="text" maxlength="30" autocomplete="off" placeholder="例如：探险员08" required aria-describedby="loginError"><label for="classCode" style="margin-top:12px">课堂码（教师提供；个人练习可留空）</label><input id="classCode" class="name-input" type="text" maxlength="16" autocomplete="off" autocapitalize="characters" placeholder="16位课堂码" aria-describedby="syncStatus"><p id="syncStatus" role="status" aria-live="polite" style="margin:6px 0 0;font-size:12px;color:#23735e">正在准备课堂同步…</p><p id="loginError" class="login-error" role="status" aria-live="polite"></p><button id="loginBtn" class="primary" type="submit">登入，准备登船<svg><use href="#arrow"/></svg></button></form><div class="boarding-note">一段海底游记，等你用文字发现。</div>
   </div><div class="boarding-title"><span class="folio">五站阅读探险</span><h2>一段游记，<br>一场海洋探险。</h2><p>文字是线索，五用车是你的座驾。<br>下一站，等你亲自发现。</p><div class="boarding-dots" aria-hidden="true"><i></i><b>···</b><i></i><b>···</b><i></i><b>···</b><i></i><b>···</b><i></i></div></div><img id="loginCar" class="login-car" alt="展开翅膀的银蓝色五用车" draggable="false"><div class="portal-caption">读文字 · 看位置 · 找事情</div>
  </div>
 </section>
@@ -1232,7 +1232,7 @@ const LABEL={sky:'空中',surface:'海面',water:'海里',floor:'海底'};
 const POS={start:{x:65,y:225},sky:{x:407,y:61},surface:{x:407,y:129},water:{x:407,y:248},floor:{x:407,y:375}};
 const ZONES=['sky','surface','water','floor'];
 const KEY='five-use-picture-local-v1';
-const profileKey=name=>KEY+':student:'+encodeURIComponent(name);
+const profileKey=name=>(document.getElementById('classCode')?.value.trim()?KEY+':class:'+document.getElementById('classCode').value.trim().toUpperCase():KEY)+':student:'+encodeURIComponent(name);
 const newAnswer=()=>({clue:null,clueCorrect:false,selectedSpace:null,moveCorrect:false,selectedEvent:null,done:false,hints:[0,0,0],errors:[0,0,0],badgeVersion:1,helpKeys:[]});
 const emptyState=()=>({name:'',authenticated:false,started:false,introDone:false,current:0,finished:false,answers:DATA.levels.map(newAnswer),prefs:{pinyin:false,english:false,slow:true,sound:true,motion:true,projector:false,voice:''}});
 let state=emptyState();
@@ -1253,12 +1253,19 @@ const stageName=i=>i===4?'返回海面':LABEL[DATA.levels[i].place];
 const originKey=i=>i===0?'start':DATA.levels[i-1].place;
 const originText=i=>i===0?'准备出发':LABEL[originKey(i)];
 function ruby(text,py){let n=0;const syllables=py.trim()?py.trim().split(/\s+/):[];return [...text].map(c=>/[\u3400-\u9fff]/u.test(c)?`<span class="han"><span class="phonetic" aria-hidden="true">${esc(syllables[n++]||'')}</span><span class="han-char">${esc(c)}</span></span>`:esc(c)).join('');}
-function save(){if(!state.authenticated||!state.name)return;try{localStorage.setItem(profileKey(state.name),JSON.stringify(state));localStorage.setItem(KEY+':last-name',state.name);}catch(e){if(!storageWarned){storageWarned=true;toast('可以继续探险；关闭网页后，进度可能无法保留。');}}}
+function save(){if(!state.authenticated||!state.name)return;try{localStorage.setItem(profileKey(state.name),JSON.stringify(state));localStorage.setItem(KEY+':last-name',state.name);}catch(e){if(!storageWarned){storageWarned=true;toast('可以继续探险；关闭网页后，进度可能无法保留。');}}window.haidiSyncState?.(state);}
+function recordHaidiAnswer(task,choice,correct){
+ if(!Array.isArray(state.haidiEvents))state.haidiEvents=[];
+ const words=['找空间线索','判断空间位置','配对游览内容'];
+ state.haidiEvents.push({kind:'answer',level:state.current+1,task,correct:correct?1:0,choice:String(choice||'未记录具体选择').slice(0,80),choiceText:String(choice||'未记录具体选择').slice(0,80),label:words[task],created_at:Date.now(),sequence:Date.now()+Math.random()});
+ state.haidiEvents=state.haidiEvents.slice(-120);
+}
+window.haidiCurrentState=()=>state;
 function loadStudent(name){
  state=emptyState();prologueOpen=false;prologueReady=false;prologueSupport={pinyin:false,english:false,word:null};passageSupportWord=null;state.name=name;state.authenticated=true;
  try{const raw=JSON.parse(localStorage.getItem(profileKey(name))||'null');if(!raw||!Array.isArray(raw.answers)||raw.answers.length!==5)return;let priorDone=true;
   state.answers=raw.answers.map((r,i)=>{const a=newAnswer(),l=DATA.levels[i];if(!r||typeof r!=='object'||!priorDone){priorDone=false;return a;}a.clue=Number.isInteger(r.clue)&&r.clue>=0&&r.clue<l.segments.length?r.clue:null;a.clueCorrect=!!r.clueCorrect&&a.clue!==null&&l.segments[a.clue].key;a.selectedSpace=ZONES.includes(r.selectedSpace)?r.selectedSpace:null;a.moveCorrect=!!r.moveCorrect&&a.clueCorrect&&a.selectedSpace===l.place;a.selectedEvent=l.events.includes(r.selectedEvent)?r.selectedEvent:null;a.done=!!r.done&&a.moveCorrect&&a.selectedEvent===l.event;priorDone=a.done;for(const field of ['hints','errors'])if(Array.isArray(r[field]))a[field]=[0,1,2].map(j=>Math.max(0,Math.min(field==='hints'?2:999,Number(r[field][j])||0)));return restoreBadgeData(r,a,l.words.length);});
-  state.current=Number.isInteger(raw.current)?Math.min(Math.max(raw.current,0),Math.min(count(),4)):0;state.finished=!!raw.finished&&count()===5;state.introDone=raw.introDone===true||state.answers.some(a=>a.clueCorrect);
+  state.haidiEvents=Array.isArray(raw.haidiEvents)?raw.haidiEvents.slice(-120):[];state.current=Number.isInteger(raw.current)?Math.min(Math.max(raw.current,0),Math.min(count(),4)):0;state.finished=!!raw.finished&&count()===5;state.introDone=raw.introDone===true||state.answers.some(a=>a.clueCorrect);
   if(raw.prefs){for(const key of ['slow','sound','motion','projector'])if(typeof raw.prefs[key]==='boolean')state.prefs[key]=raw.prefs[key];if(typeof raw.prefs.voice==='string')state.prefs.voice=raw.prefs.voice;}
  }catch(e){}
 }
@@ -1295,8 +1302,8 @@ function renderPassage(){if(state.prefs.pinyin)noteBadgeHelp('pinyin');const l=D
 function hintSet(){const p=phase();return p===0?'clueHints':p===1?'moveHints':'eventHints';}
 function renderHint(){renderPilotHint();renderMapHint();const p=phase(),a=state.answers[state.current];$('hintArea').hidden=p===3||arriving;const n=p<3?a.hints[p]:0;$('hintBox').hidden=!n;$('hintBox').classList.toggle('automatic-hint',n>0&&a.errors[p]>0);$('hintButtonLabel').textContent=n===0?'给我一点提示':n===1?'再给一点提示':'重看提示';if(n){$('hintLevel').textContent=`提示${n}／2`;$('hintText').textContent=DATA.levels[state.current][hintSet()][n-1];}}
 function getHint(){const p=phase();if(p>=3||arriving)return;const a=state.answers[state.current];a.hints[p]=Math.min(2,a.hints[p]+1);save();renderHint();if(p===0)renderPassage();renderAchievements();}
-function wrong(task,message){const a=state.answers[state.current];a.errors[task]++;a.hints[task]=Math.max(a.hints[task],Math.min(2,a.errors[task]));save();feedback(message,'try');renderHint();if(task===0)renderPassage();showAutomaticHint();}
-function selectClue(i){if(!activePlay()||state.prefs.english)return;const l=DATA.levels[state.current],a=state.answers[state.current];if(a.clueCorrect||a.done||!l.segments[i])return;a.clue=i;if(l.segments[i].key){a.clueCorrect=true;save();renderPassage();renderTasks();feedback('线索找对了！现在看看五用车要怎样换位置。');playChime();$('checkMoveBtn').disabled=true;}else{let message='再读一读：这部分是否写五用车来到新地点？找表示移动或位置变化的词句。';if(state.current===0&&l.segments[i].t.startsWith('飞向'))message='这里写前进的方向。再找表示已经到达某处的词句。';if(state.current===3&&l.segments[i].t.includes('生活'))message='这里写动物怎样生活。请找五用车移动到新地点的词句。';if(state.current===4&&i<=1)message='这里回顾在牧场的活动。继续读，找五用车离开水下的线索。';wrong(0,message);const chosen=$('passage').querySelector(`[data-segment="${i}"]`);if(chosen)chosen.focus({preventScroll:true});}}
+function wrong(task,message,submittedChoice){const a=state.answers[state.current];const choice=task===0?DATA.levels[state.current].segments[a.clue]?.t:task===1?submittedChoice:DATA.events[a.selectedEvent]?.text;recordHaidiAnswer(task,choice,false);a.errors[task]++;a.hints[task]=Math.max(a.hints[task],Math.min(2,a.errors[task]));save();feedback(message,'try');renderHint();if(task===0)renderPassage();showAutomaticHint();}
+function selectClue(i){if(!activePlay()||state.prefs.english)return;const l=DATA.levels[state.current],a=state.answers[state.current];if(a.clueCorrect||a.done||!l.segments[i])return;a.clue=i;if(l.segments[i].key){a.clueCorrect=true;recordHaidiAnswer(0,l.segments[i].t,true);save();renderPassage();renderTasks();feedback('线索找对了！现在看看五用车要怎样换位置。');playChime();$('checkMoveBtn').disabled=true;}else{let message='再读一读：这部分是否写五用车来到新地点？找表示移动或位置变化的词句。';if(state.current===0&&l.segments[i].t.startsWith('飞向'))message='这里写前进的方向。再找表示已经到达某处的词句。';if(state.current===3&&l.segments[i].t.includes('生活'))message='这里写动物怎样生活。请找五用车移动到新地点的词句。';if(state.current===4&&i<=1)message='这里回顾在牧场的活动。继续读，找五用车离开水下的线索。';wrong(0,message);const chosen=$('passage').querySelector(`[data-segment="${i}"]`);if(chosen)chosen.focus({preventScroll:true});}}
 function setCarPosition(p,animate=true){const car=$('mapVehicle');car.classList.toggle('dragging',!animate);car.style.left=(p.x/640*100)+'%';car.style.top=(p.y/420*100)+'%';}
 function mapPath(from,to){$('trialPath').setAttribute('d',to?`M ${from.x} ${from.y} C ${from.x} ${(from.y+to.y)/2} ${to.x} ${(from.y+to.y)/2} ${to.x} ${to.y}`:'');}
 function renderMap(){updateVehicles();const a=state.answers[state.current],previous=originKey(state.current),from=POS[previous];$('originName').textContent=originText(state.current);$('mapStartLabel').hidden=state.current!==0;$('mapOrigin').hidden=!a.selectedSpace;$('mapOrigin').style.left=(from.x/640*100)+'%';$('mapOrigin').style.top=(from.y/420*100)+'%';const point=a.selectedSpace?POS[a.selectedSpace]:from;setCarPosition(point);mapPath(from,a.selectedSpace?point:null);document.querySelectorAll('.zone').forEach(z=>{z.disabled=arriving||a.moveCorrect;z.classList.toggle('selected',z.dataset.zone===a.selectedSpace);});$('checkMoveBtn').disabled=!a.selectedSpace||arriving||a.moveCorrect;$('mapVehicle').disabled=arriving||a.moveCorrect;$('mapLabel').hidden=true;$('movementResult').hidden=true;}
@@ -1307,10 +1314,10 @@ function pointerDown(e){if(phase()!==1||arriving||e.button>0)return;dragging={po
 function pointerMove(e){if(!dragging||e.pointerId!==dragging.pointer)return;const p=mapPoint(e);p.x=Math.max(22,Math.min(625,p.x));p.y=Math.max(20,Math.min(401,p.y));setCarPosition(p,false);document.querySelectorAll('.zone').forEach(z=>z.classList.toggle('chosen',z.dataset.zone===spaceAt(p.x,p.y)));}
 function pointerUp(e){if(!dragging||e.pointerId!==dragging.pointer)return;dragging=null;try{$('mapVehicle').releasePointerCapture?.(e.pointerId);}catch(err){}$('mapVehicle').classList.remove('dragging');document.querySelectorAll('.zone').forEach(z=>z.classList.remove('chosen'));const p=mapPoint(e),zone=spaceAt(p.x,p.y);if(zone)chooseSpace(zone);else{renderMap();toast('请把五用车放进右边的空间图，也可以直接点击位置。');}}
 function cancelMove(){clearTimeout(arrivalTimer);arrivalTimer=null;arriving=false;dragging=null;$('mapVehicle').classList.remove('dragging','moving');}
-function checkMove(){if(!activePlay())return;const i=state.current,l=DATA.levels[i],a=state.answers[i];if(phase()!==1||arriving||!a.selectedSpace)return;if(a.selectedSpace!==l.place){a.selectedSpace=null;renderMap();wrong(1,'再想一想：上一站在哪里？这条线索说明五用车往哪儿移动？');return;}a.moveCorrect=true;save();arriving=true;const from=POS[originKey(i)],to=POS[l.place];setCarPosition(from,false);$('mapVehicle').offsetWidth;$('mapVehicle').classList.remove('dragging');setCarPosition(to,true);$('mapVehicle').classList.add('moving');$('mapVehicle').disabled=true;$('checkMoveBtn').disabled=true;document.querySelectorAll('.zone').forEach(z=>z.disabled=true);$('mapLabel').textContent=stageName(i);$('mapLabel').style.left=(to.x/640*100)+'%';$('mapLabel').style.top=((to.y+34)/420*100)+'%';$('mapLabel').hidden=false;$('movementResult').textContent=`${originText(i)} → ${i===4?'海面（返回）':LABEL[l.place]}`;$('movementResult').hidden=false;feedback('位置判断正确！五用车正在前往新位置。');renderHint();changeScene(l.scene);updateVehicles();travelToScene(i);$('caption').textContent=`已到达：${stageName(i)}`;playChime();startArrivalJourney(i);}
+function checkMove(){if(!activePlay())return;const i=state.current,l=DATA.levels[i],a=state.answers[i];if(phase()!==1||arriving||!a.selectedSpace)return;if(a.selectedSpace!==l.place){const choice=LABEL[a.selectedSpace];a.selectedSpace=null;renderMap();wrong(1,'再想一想：上一站在哪里？这条线索说明五用车往哪儿移动？',choice);return;}a.moveCorrect=true;recordHaidiAnswer(1,LABEL[l.place],true);save();arriving=true;const from=POS[originKey(i)],to=POS[l.place];setCarPosition(from,false);$('mapVehicle').offsetWidth;$('mapVehicle').classList.remove('dragging');setCarPosition(to,true);$('mapVehicle').classList.add('moving');$('mapVehicle').disabled=true;$('checkMoveBtn').disabled=true;document.querySelectorAll('.zone').forEach(z=>z.disabled=true);$('mapLabel').textContent=stageName(i);$('mapLabel').style.left=(to.x/640*100)+'%';$('mapLabel').style.top=((to.y+34)/420*100)+'%';$('mapLabel').hidden=false;$('movementResult').textContent=`${originText(i)} → ${i===4?'海面（返回）':LABEL[l.place]}`;$('movementResult').hidden=false;feedback('位置判断正确！五用车正在前往新位置。');renderHint();changeScene(l.scene);updateVehicles();travelToScene(i);$('caption').textContent=`已到达：${stageName(i)}`;playChime();startArrivalJourney(i);}
 function renderEvents(){const l=DATA.levels[state.current],a=state.answers[state.current],el=$('eventGrid');$('eventQuestion').textContent=state.current>=2?'主人公看到了什么？':'这里发生了什么？';$('currentVista').setAttribute('href',ART[l.scene]);$('currentVistaFrame').dataset.scene=l.scene;$('currentVistaTitle').textContent=`当前地点${stageName(state.current)}的舷窗景色`;el.replaceChildren();l.events.forEach((key,index)=>{const e=DATA.events[key],label=e.text.replace(/。/g,''),b=document.createElement('button');b.type='button';b.className='event-card'+(a.selectedEvent===key?' selected':'');b.draggable=true;b.dataset.event=key;b.setAttribute('aria-pressed',String(a.selectedEvent===key));b.setAttribute('aria-label',label);b.innerHTML=`<span class="letter" aria-hidden="true">${String.fromCharCode(65+index)}</span><span class="event-copy">${ruby(label,e.py)}</span>`;b.addEventListener('click',()=>selectEvent(key));b.addEventListener('dragstart',ev=>{if(phase()!==2){ev.preventDefault();return;}selectEvent(key);ev.dataTransfer.setData('text/plain',key);ev.dataTransfer.effectAllowed='move';});el.append(b);});$('eventDock').disabled=a.done||!a.moveCorrect;$('eventDock').classList.toggle('ready',!!a.selectedEvent);$('dockIcon').innerHTML=`<use href="#${l.place}"/>`;$('dockPlace').textContent=`当前地点：${stageName(state.current)}`;$('dockTitle').textContent=a.selectedEvent?'点击这里，确认配对':'先选答案，再点这里配对';}
 function selectEvent(key){const l=DATA.levels[state.current],a=state.answers[state.current];if(phase()!==2||!l.events.includes(key))return;a.selectedEvent=key;save();clearFeedback();document.querySelectorAll('.event-card').forEach(b=>{b.classList.toggle('selected',b.dataset.event===key);b.setAttribute('aria-pressed',String(b.dataset.event===key));});$('eventDock').classList.add('ready');$('dockTitle').textContent='点击这里，确认配对';}
-function pairEvent(key){if(!activePlay())return;const i=state.current,l=DATA.levels[i],a=state.answers[i];if(phase()!==2||arriving||!l.events.includes(key))return;a.selectedEvent=key;if(key!==l.event){save();renderEvents();let message=i>=2?'再读本段：主人公在这里看到了什么？用本段的内容配对事件卡。':'这件事和本段的内容还没有配上。再读一读：主人公在这里做了什么？';if(i===4&&key==='sail')message='这张卡是先前到海面时的事情。请读现在这一段，看看这次海面有什么不同。';wrong(2,message);return;}a.done=true;state.finished=false;save();stopReading();playChime(true);render();flashCorrectPuzzle();celebrateStage(i);if(i<4)toast(`第${NUM[i]}关完成，新地点已加入路线记录。`);else toast('五关完成！你已经读懂这段游览经过。');}
+function pairEvent(key){if(!activePlay())return;const i=state.current,l=DATA.levels[i],a=state.answers[i];if(phase()!==2||arriving||!l.events.includes(key))return;a.selectedEvent=key;if(key!==l.event){save();renderEvents();let message=i>=2?'再读本段：主人公在这里看到了什么？用本段的内容配对事件卡。':'这件事和本段的内容还没有配上。再读一读：主人公在这里做了什么？';if(i===4&&key==='sail')message='这张卡是先前到海面时的事情。请读现在这一段，看看这次海面有什么不同。';wrong(2,message);return;}a.done=true;state.finished=false;recordHaidiAnswer(2,DATA.events[key].text,true);save();stopReading();playChime(true);render();flashCorrectPuzzle();celebrateStage(i);if(i<4)toast(`第${NUM[i]}关完成，新地点已加入路线记录。`);else toast('五关完成！你已经读懂这段游览经过。');}
 function renderTasks(){renderExpedition();const p=phase(),i=state.current,l=DATA.levels[i],a=state.answers[i];['clueTask','moveTask','eventTask','doneTask'].forEach((id,n)=>$(id).hidden=n!==p);[1,2,3].forEach((n,j)=>{$('step'+n).className='task-step'+(j<p?' done':j===p?' active':'');});if(p===1)renderMap();if(p===2)renderEvents();if(p===3){$('doneTitle').textContent=`第${NUM[i]}关，完成了！`;$('doneCopy').textContent=l.success;$('summaryPair').innerHTML=`<strong>${esc(stageName(i))}</strong> · ${esc(DATA.events[l.event].text)}`;$('nextBtn').innerHTML=(i===4?'查看完整航线':'解锁航线，前往下一关')+icon('arrow');}renderHint();}
 function render(){
  prefs();renderExpedition();const logged=state.authenticated,inOpening=logged&&prologueOpen;$('loginPage').hidden=logged;$('appShell').hidden=!logged;$('prologue').hidden=!inOpening;$('panorama').hidden=inOpening;$('dashboard').hidden=inOpening||!logged||!state.started;document.body.classList.toggle('landing',(!state.started&&!inOpening)||!logged);document.body.classList.toggle('prologue-mode',inOpening);
@@ -1424,5 +1431,72 @@ window.addEventListener('pagehide',stopReading);
 if('speechSynthesis' in window)window.speechSynthesis.addEventListener('voiceschanged',updateVoices);
 bindExpedition();setupImages();prefillName();render();updateVoices();
 
+</script>
+
+<script type="module" id="haidi-firebase-student-bridge">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+const firebaseConfig = {
+  apiKey: "AIzaSyAfLAZfGsn1BHXaOE55zNesS11p3PJMtvS",
+  authDomain: "haidi-pasture-1g1.firebaseapp.com",
+  projectId: "haidi-pasture-1g1",
+  appId: "1:690998733974:web:668354c27307498d3326b7"
+};
+const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
+const classroomInput=document.getElementById('classCode');
+const status=document.getElementById('syncStatus');
+const queryCode=new URL(location.href).searchParams.get('class');
+if(queryCode)classroomInput.value=queryCode.trim().toUpperCase();
+else classroomInput.value=localStorage.getItem('haidi:last-class')||'';
+function message(s,bad=false){status.textContent=s;status.style.color=bad?'#a43c34':'#23735e';}
+const authReady=new Promise((resolve,reject)=>{
+ const unsub=onAuthStateChanged(auth, async user=>{
+   unsub();if(user){resolve(user);return;}
+   try{resolve((await signInAnonymously(auth)).user);}catch(e){reject(e);}
+ },reject);
+});
+const pause=ms=>new Promise(r=>setTimeout(r,ms));
+async function idFor(name,uid){
+  const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(name));
+  const hash=Array.from(new Uint8Array(bytes).slice(0,6),v=>v.toString(16).padStart(2,'0')).join('');
+  return uid+'_'+hash;
+}
+let queued=null,timer=0,writing=false;
+async function flush(){
+ if(writing||!queued)return;
+ const snapshot=queued;queued=null;writing=true;
+ try{
+  const code=classroomInput.value.trim().toUpperCase();
+  if(!code){message('个人练习：未加入课堂，进度只保存在此浏览器');return;}
+  if(!/^[A-Z2-9]{16}$/.test(code))throw Error('课堂码格式不正确，请向教师核对16位课堂码。');
+  const user=await authReady;
+  const classDoc=await getDoc(doc(db,'classes',code));
+  if(!classDoc.exists())throw Error('找不到课堂，请核对课堂码。');
+  if(!classDoc.data().active)throw Error('该课堂已结束，无法继续同步。');
+  const participantId=await idFor(snapshot.name,user.uid);
+  const answerFields=['clue','clueCorrect','selectedSpace','moveCorrect','selectedEvent','done','hints','errors','badgeVersion','helpKeys'];
+  const cleanAnswers=snapshot.answers.map(a=>Object.fromEntries(answerFields.map(k=>[k,a[k]??null])));
+  const activity=(Array.isArray(snapshot.haidiEvents)?snapshot.haidiEvents:[]).slice(-120);
+  const saved={name:snapshot.name,attempt:1,updated_at:Date.now(),last_seen:Date.now(),snapshot:{current:snapshot.current,finished:!!snapshot.finished,introDone:!!snapshot.introDone,answers:cleanAnswers},events:activity};
+  await setDoc(doc(db,'classes',code,'participants',participantId),saved);
+  localStorage.setItem('haidi:last-class',code);
+  message('课堂同步成功 · 教师端可查看你的学习进度');
+ }catch(e){message('课堂同步失败：'+(e.code==='permission-denied'?'没有写入权限，请检查 Firestore Rules':e.message),true);}
+ finally{writing=false;if(queued){clearTimeout(timer);timer=setTimeout(flush,700);}}
+}
+window.haidiSyncState=function(state){
+ if(!state||!state.authenticated||!state.name)return;
+ queued=typeof structuredClone === "function" ? structuredClone(state) : JSON.parse(JSON.stringify(state));
+ if(!classroomInput.value.trim()){message('个人练习：请填写课堂码以同步给教师');return;}
+ clearTimeout(timer);timer=setTimeout(flush,650);
+};
+classroomInput.addEventListener('change',()=>{
+ classroomInput.value=classroomInput.value.trim().toUpperCase();
+ const state=window.haidiCurrentState?.();if(state?.authenticated)window.haidiSyncState(state);
+});
+message(classroomInput.value?'已填写课堂码，登入后将同步进度':'未填写课堂码：仍可进行个人练习');
+window.addEventListener('pagehide',()=>{if(queued)flush();});
+if(window.haidiCurrentState?.()?.authenticated)window.haidiSyncState(window.haidiCurrentState());
 </script>
 </body></html>

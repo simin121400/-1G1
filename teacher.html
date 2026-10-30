@@ -35,10 +35,14 @@ async function loadRoom(code){
 }
 function randomCode(){const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';const bytes=crypto.getRandomValues(new Uint8Array(16));return [...bytes].map(b=>alphabet[b%alphabet.length]).join('');}
 async function handleApi(path,opt){
- await authReady;
- const method=(opt.method||'GET').toUpperCase();
+ // This is a public classroom dashboard.  The old React shell uses an
+ // /api/teacher/session probe to decide whether to display any dashboard at all.
+ // A Firebase network/auth failure must not incorrectly show the obsolete
+ // 'backend not deployed' screen.  Actual data operations still require authReady.
  if(path==='/api/teacher/session')return {authenticated:true};
  if(path==='/api/teacher/logout')return {ok:true};
+ await authReady;
+ const method=(opt.method||'GET').toUpperCase();
  if(path==='/api/classes'&&method==='GET'){
   const rooms=[];
   for(const c of knownCodes()){try{const d=await getDoc(doc(db,'classes',c));if(d.exists())rooms.push(asRoom(d));}catch(e){console.warn('课堂读取失败',c,e.code);}}
@@ -85,6 +89,27 @@ const join=document.createElement('aside');
 join.style.cssText='position:fixed;right:14px;bottom:14px;z-index:120;background:#10384b;color:white;border:1px solid #7fb5ba;border-radius:12px;box-shadow:0 8px 28px #062c3b66;padding:10px 14px;font:13px/1.65 system-ui,sans-serif;max-width:min(96vw,420px)';
 join.innerHTML='<div style="font-weight:700">公开教师工作台 · 无需登录</div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><input id="haidiTeacherJoin" aria-label="加入已建立的课堂码" placeholder="已有课堂码？在这里输入" maxlength="16" style="flex:1;min-width:185px;border:1px solid #a8d3d6;border-radius:6px;padding:7px"><button id="haidiTeacherJoinBtn" style="background:#cceadb;border:0;padding:7px 10px;border-radius:7px;cursor:pointer">查看课堂</button></div><div style="font-size:11px;color:#b6d3d3">共享课堂码即共享查看权限。请使用学生昵称。</div>';
 document.body.append(join);
+const connectionState=document.createElement('div');
+connectionState.id='haidiFirebaseStatus';
+connectionState.setAttribute('role','status');
+connectionState.style.cssText='margin-top:7px;color:#dfeced;font-size:12px;line-height:1.6;overflow-wrap:anywhere';
+connectionState.textContent='Firebase：正在验证匿名身份和数据库连接…';
+join.append(connectionState);
+// Verifies the actual Firebase connection and exposes a useful error if it fails.
+// The classroom dashboard can render before this check finishes, but class
+// creation/reading is not declared operational until the test succeeds.
+authReady.then(async user=>{
+ connectionState.textContent='Firebase：匿名身份已连接，正在检查 Firestore…';
+ // Check a known-nonexistent, syntactically valid class document. Rules allow
+ // signed-in get-by-ID but no listing. This does not create or change data.
+ await getDoc(doc(db,'classes','AAAAAAAAAAAAAAAA'));
+ connectionState.textContent='✓ Firebase 身份验证及 Firestore 连接正常。可点击「建立课堂」。';
+ connectionState.style.color='#b3efd1';
+}).catch(err=>{
+ connectionState.textContent='⚠ Firebase 连接失败：'+(err?.code||'')+' '+(err?.message||String(err))+'。请截图此提示。';
+ connectionState.style.color='#ffd899';
+ console.error('Haidi Firebase connection failed',err);
+});
 document.getElementById('haidiTeacherJoinBtn').addEventListener('click',async()=>{
  const code=document.getElementById('haidiTeacherJoin').value.trim().toUpperCase();
  if(!remember(code)){alert('请输入16位课堂码');return;}
